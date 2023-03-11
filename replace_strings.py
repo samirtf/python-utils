@@ -1,56 +1,71 @@
 import os
-import sys
-import chardet
-import traceback
 
-def replace_strings_in_file(file_path, old_string, new_string):
+
+def replace_in_files(src_dir: str, old: str, new: str, skip_git=True) -> None:
+    """
+    Recursively replaces all occurrences of the string 'old' with the string 'new'
+    in all files and directories contained within the source directory 'src_dir'.
+    """
+    for root, dirs, files in os.walk(src_dir):
+        if skip_git and ".git" in dirs:
+            dirs.remove(".git")
+        for file in files:
+            if not file.endswith(".git"):
+                replace_in_file(os.path.join(root, file), old, new)
+        for dir in dirs:
+            if not dir.endswith(".git"):
+                replace_in_directory(os.path.join(root, dir), old, new)
+
+
+def replace_in_file(file_path: str, old: str, new: str) -> None:
+    """
+    Replaces all occurrences of the string 'old' with the string 'new' in the
+    contents of the file specified by 'file_path'. If any replacements are made,
+    the modified contents are written back to the file.
+    """
     try:
-        with open(file_path, 'rb') as file:
-            file_contents = file.read()
-            detected_encoding = chardet.detect(file_contents)['encoding']
-        with open(file_path, 'w', encoding=detected_encoding or 'utf-8') as file:
-            file_contents = file_contents.decode(detected_encoding or 'utf-8')
-            new_contents = file_contents.replace(old_string, new_string)
-            file.write(new_contents)
-    except Exception as e:
-        print(f"Error replacing strings in file {file_path}: {e}")
-        traceback.print_exc()
+        with open(file_path, 'rb') as f:
+            content = f.read().decode('utf-8')
+    except (UnicodeDecodeError, PermissionError):
+        return
+    new_content = content.replace(old, new)
+    if new_content != content:
+        new_file_path = file_path.replace(old, new)
+        with open(new_file_path, 'wb') as f:
+            f.write(new_content.encode('utf-8'))
+        os.remove(file_path)
 
-def replace_strings_in_directory(directory_path, old_string, new_string):
+
+def replace_in_directory(dir_path: str, old: str, new: str) -> None:
+    """
+    Recursively replaces all occurrences of the string 'old' with the string 'new'
+    in all files and directories contained within the directory specified by 'dir_path'.
+    If any directories are renamed, the renamed directories are processed recursively.
+    """
+    old_dir_name = os.path.basename(dir_path)
+    new_dir_name = old_dir_name.replace(old, new)
+    if new_dir_name != old_dir_name:
+        try:
+            os.rename(dir_path, os.path.join(os.path.dirname(dir_path), new_dir_name))
+        except OSError:
+            return
+    replace_in_files(os.path.join(os.path.dirname(dir_path), new_dir_name), old, new)
+
+
+if __name__ == "__main__":
+    import argparse
+
+    parser = argparse.ArgumentParser(description="Recursively replace string in directory files and directories.")
+    parser.add_argument("src_dir", help="source directory")
+    parser.add_argument("old", help="string to replace")
+    parser.add_argument("new", help="new string")
+    parser.add_argument("--skip_git", action="store_true", help="skip .git directories")
+
+    args = parser.parse_args()
+
     try:
-        for root, dirs, files in os.walk(directory_path):
-            for file_name in files:
-                file_path = os.path.join(root, file_name)
-                try:
-                    replace_strings_in_file(file_path, old_string, new_string)
-                    new_file_name = file_name.replace(old_string, new_string)
-                    if new_file_name != file_name:
-                        new_file_path = os.path.join(root, new_file_name)
-                        os.rename(file_path, new_file_path)
-                except Exception as e:
-                    print(f"Error replacing strings in file {file_path}: {e}")
-                    traceback.print_exc()
-            for dir_name in dirs:
-                dir_path = os.path.join(root, dir_name)
-                try:
-                    new_dir_name = dir_name.replace(old_string, new_string)
-                    new_dir_path = os.path.join(root, new_dir_name)
-                    if new_dir_name != dir_name:
-                        os.rename(dir_path, new_dir_path)
-                        dir_path = new_dir_path  # Fix UnboundLocalError
-                    replace_strings_in_directory(dir_path, old_string, new_string)  # Recursive call
-                except Exception as e:
-                    print(f"Error replacing strings in directory {dir_path}: {e}")
-                    traceback.print_exc()
+        replace_in_files(args.src_dir, args.old, args.new, args.skip_git)
     except Exception as e:
-        print(f"Error replacing strings in directory {directory_path}: {e}")
+        import traceback
         traceback.print_exc()
-
-if __name__ == '__main__':
-    if len(sys.argv) != 4:
-        print('Usage: python replace_strings.py <directory_path> <old_string> <new_string>')
-    else:
-        directory_path = sys.argv[1]
-        old_string = sys.argv[2]
-        new_string = sys.argv[3]
-        replace_strings_in_directory(directory_path, old_string, new_string)
+        print(f"An error occurred: {e}")
