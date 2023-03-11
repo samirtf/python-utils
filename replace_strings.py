@@ -23,8 +23,8 @@ def replace_strings_in_directory(directory_path, old_string, new_string):
         for dir_name in dirs:
             dir_path = os.path.join(root, dir_name)
             new_dir_name = dir_name.replace(old_string, new_string)
+            new_dir_path = os.path.join(root, new_dir_name)
             if new_dir_name != dir_name:
-                new_dir_path = os.path.join(root, new_dir_name)
                 os.rename(dir_path, new_dir_path)
             replace_strings_in_directory(new_dir_path, old_string, new_string)
 
