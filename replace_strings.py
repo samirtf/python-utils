@@ -6,8 +6,8 @@ def replace_strings_in_file(file_path, old_string, new_string):
     with open(file_path, 'rb') as file:
         file_contents = file.read()
         detected_encoding = chardet.detect(file_contents)['encoding']
-    with open(file_path, 'w', encoding=detected_encoding) as file:
-        file_contents = file_contents.decode(detected_encoding)
+    with open(file_path, 'w', encoding=detected_encoding or 'utf-8') as file:
+        file_contents = file_contents.decode(detected_encoding or 'utf-8')
         new_contents = file_contents.replace(old_string, new_string)
         file.write(new_contents)
 
