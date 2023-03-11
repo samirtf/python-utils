@@ -1,54 +1,46 @@
 import os
-import shutil
+import argparse
+import chardet
 
-def replace_in_file(filepath, old_str, new_str):
-    """Replace old_str with new_str in the contents of a file."""
-    with open(filepath, 'r', encoding='utf-8') as f:
-        file_content = f.read()
-    file_content = file_content.replace(old_str, new_str)
-    with open(filepath, 'w', encoding='utf-8') as f:
-        f.write(file_content)
+DEFAULT_IGNORE_LIST = ['.git', '.github']
 
-def replace_in_dir(source_dir, destination_dir, old_str, new_str, excluded_files=None):
-    """Replace old_str with new_str in all file contents and filenames in a directory."""
-    if excluded_files is None:
-        excluded_files = ['.git']
-        
-    # Create destination directory if it doesn't exist
-    if not os.path.exists(destination_dir):
-        os.makedirs(destination_dir)
+def replace_strings_in_file(file_path, old_str, new_str):
+    with open(file_path, 'rb') as f:
+        raw_data = f.read()
+        detected_encoding = chardet.detect(raw_data)['encoding']
+        if detected_encoding is None:
+            raise Exception(f"Could not detect encoding for file {file_path}")
+        decoded_data = raw_data.decode(detected_encoding, errors='replace')
+    replaced_data = decoded_data.replace(old_str, new_str)
+    encoded_data = replaced_data.encode(detected_encoding, errors='replace')
+    with open(file_path, 'wb') as f:
+        f.write(encoded_data)
 
-    for item in os.listdir(source_dir):
-        # Check if item is excluded
-        if item in excluded_files:
-            continue
-        
-        source_path = os.path.join(source_dir, item)
-        destination_path = os.path.join(destination_dir, item)
+def replace_strings_in_dir(dir_path, old_str, new_str, output_dir, ignore_list):
+    for root, dirs, files in os.walk(dir_path):
+        dirs[:] = [d for d in dirs if d not in ignore_list]
+        for file_name in files:
+            if file_name not in ignore_list:
+                file_path = os.path.join(root, file_name)
+                try:
+                    replace_strings_in_file(file_path, old_str, new_str)
+                    new_file_path = os.path.join(root.replace(dir_path, output_dir), file_name)
+                    os.makedirs(os.path.dirname(new_file_path), exist_ok=True)
+                    shutil.copy2(file_path, new_file_path)
+                except Exception as e:
+                    print(f"Error processing file {file_path}: {e}")
 
-        if os.path.isdir(source_path):
-            replace_in_dir(source_path, destination_path, old_str, new_str, excluded_files)
-        else:
-            replace_in_file(source_path, old_str, new_str)
-            shutil.copy2(source_path, destination_path)
-            
-    print(f"Replacement completed for directory {source_dir}")
+def main():
+    parser = argparse.ArgumentParser(description='Replace strings in files recursively.')
+    parser.add_argument('dir_path', type=str, help='The directory path to start replacing strings.')
+    parser.add_argument('old_str', type=str, help='The string to be replaced.')
+    parser.add_argument('new_str', type=str, help='The new string to replace the old one.')
+    parser.add_argument('output_dir', type=str, help='The directory path to copy files and apply changes.')
+    parser.add_argument('--ignore_list', type=str, nargs='+', default=DEFAULT_IGNORE_LIST,
+                        help='A list of file names to ignore during string replacement.')
+    args = parser.parse_args()
+
+    replace_strings_in_dir(args.dir_path, args.old_str, args.new_str, args.output_dir, args.ignore_list)
 
 if __name__ == '__main__':
-    import sys
-    
-    if len(sys.argv) < 5:
-        print("Usage: python replace_files.py <source> <destination> <old_string> <new_string>")
-        sys.exit(1)
-    
-    source_dir = sys.argv[1]
-    destination_dir = sys.argv[2]
-    old_str = sys.argv[3]
-    new_str = sys.argv[4]
-
-    if "--exclude-git" in sys.argv:
-        excluded_files = ['.git']
-    else:
-        excluded_files = None
-
-    replace_in_dir(source_dir, destination_dir, old_str, new_str, excluded_files)
+    main()
