@@ -20,6 +20,7 @@ def replace_strings_in_file(file_path, old_str, new_str):
 def replace_strings_in_dir(dir_path, old_str, new_str, output_dir, ignore_list):
     for root, dirs, files in os.walk(dir_path):
         dirs[:] = [d for d in dirs if d not in ignore_list]
+        files[:] = [f for f in files if not f.lower().endswith(tuple(ignore_list))]
         for file_name in files:
             if file_name not in ignore_list:
                 file_path = os.path.join(root, file_name)
