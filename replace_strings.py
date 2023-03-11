@@ -6,8 +6,6 @@ def replace_strings_in_file(file_path, old_string, new_string):
     with open(file_path, 'rb') as file:
         file_contents = file.read()
         detected_encoding = chardet.detect(file_contents)['encoding']
-        if detected_encoding is None:
-            detected_encoding = 'utf-8'
     with open(file_path, 'w', encoding=detected_encoding) as file:
         file_contents = file_contents.decode(detected_encoding)
         new_contents = file_contents.replace(old_string, new_string)
@@ -28,7 +26,8 @@ def replace_strings_in_directory(directory_path, old_string, new_string):
             new_dir_path = os.path.join(root, new_dir_name)
             if new_dir_name != dir_name:
                 os.rename(dir_path, new_dir_path)
-            replace_strings_in_directory(new_dir_path, old_string, new_string)
+                dir_path = new_dir_path  # Fix UnboundLocalError
+            replace_strings_in_directory(dir_path, old_string, new_string)  # Recursive call
 
 if __name__ == '__main__':
     if len(sys.argv) != 4:
