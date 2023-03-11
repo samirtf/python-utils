@@ -1,6 +1,7 @@
 import os
 import argparse
 import chardet
+import shutil
 
 DEFAULT_IGNORE_LIST = ['.git', '.github']
 
