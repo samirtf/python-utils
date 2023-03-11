@@ -1,71 +1,54 @@
 import os
+import shutil
 
+def replace_in_file(filepath, old_str, new_str):
+    """Replace old_str with new_str in the contents of a file."""
+    with open(filepath, 'r', encoding='utf-8') as f:
+        file_content = f.read()
+    file_content = file_content.replace(old_str, new_str)
+    with open(filepath, 'w', encoding='utf-8') as f:
+        f.write(file_content)
 
-def replace_in_files(src_dir: str, old: str, new: str, skip_git=True) -> None:
-    """
-    Recursively replaces all occurrences of the string 'old' with the string 'new'
-    in all files and directories contained within the source directory 'src_dir'.
-    """
-    for root, dirs, files in os.walk(src_dir):
-        if skip_git and ".git" in dirs:
-            dirs.remove(".git")
-        for file in files:
-            if not file.endswith(".git"):
-                replace_in_file(os.path.join(root, file), old, new)
-        for dir in dirs:
-            if not dir.endswith(".git"):
-                replace_in_directory(os.path.join(root, dir), old, new)
+def replace_in_dir(source_dir, destination_dir, old_str, new_str, excluded_files=None):
+    """Replace old_str with new_str in all file contents and filenames in a directory."""
+    if excluded_files is None:
+        excluded_files = ['.git']
+        
+    # Create destination directory if it doesn't exist
+    if not os.path.exists(destination_dir):
+        os.makedirs(destination_dir)
 
+    for item in os.listdir(source_dir):
+        # Check if item is excluded
+        if item in excluded_files:
+            continue
+        
+        source_path = os.path.join(source_dir, item)
+        destination_path = os.path.join(destination_dir, item)
 
-def replace_in_file(file_path: str, old: str, new: str) -> None:
-    """
-    Replaces all occurrences of the string 'old' with the string 'new' in the
-    contents of the file specified by 'file_path'. If any replacements are made,
-    the modified contents are written back to the file.
-    """
-    try:
-        with open(file_path, 'rb') as f:
-            content = f.read().decode('utf-8')
-    except (UnicodeDecodeError, PermissionError):
-        return
-    new_content = content.replace(old, new)
-    if new_content != content:
-        new_file_path = file_path.replace(old, new)
-        with open(new_file_path, 'wb') as f:
-            f.write(new_content.encode('utf-8'))
-        os.remove(file_path)
+        if os.path.isdir(source_path):
+            replace_in_dir(source_path, destination_path, old_str, new_str, excluded_files)
+        else:
+            replace_in_file(source_path, old_str, new_str)
+            shutil.copy2(source_path, destination_path)
+            
+    print(f"Replacement completed for directory {source_dir}")
 
+if __name__ == '__main__':
+    import sys
+    
+    if len(sys.argv) < 5:
+        print("Usage: python replace_files.py <source> <destination> <old_string> <new_string>")
+        sys.exit(1)
+    
+    source_dir = sys.argv[1]
+    destination_dir = sys.argv[2]
+    old_str = sys.argv[3]
+    new_str = sys.argv[4]
 
-def replace_in_directory(dir_path: str, old: str, new: str) -> None:
-    """
-    Recursively replaces all occurrences of the string 'old' with the string 'new'
-    in all files and directories contained within the directory specified by 'dir_path'.
-    If any directories are renamed, the renamed directories are processed recursively.
-    """
-    old_dir_name = os.path.basename(dir_path)
-    new_dir_name = old_dir_name.replace(old, new)
-    if new_dir_name != old_dir_name:
-        try:
-            os.rename(dir_path, os.path.join(os.path.dirname(dir_path), new_dir_name))
-        except OSError:
-            return
-    replace_in_files(os.path.join(os.path.dirname(dir_path), new_dir_name), old, new)
+    if "--exclude-git" in sys.argv:
+        excluded_files = ['.git']
+    else:
+        excluded_files = None
 
-
-if __name__ == "__main__":
-    import argparse
-
-    parser = argparse.ArgumentParser(description="Recursively replace string in directory files and directories.")
-    parser.add_argument("src_dir", help="source directory")
-    parser.add_argument("old", help="string to replace")
-    parser.add_argument("new", help="new string")
-    parser.add_argument("--skip_git", action="store_true", help="skip .git directories")
-
-    args = parser.parse_args()
-
-    try:
-        replace_in_files(args.src_dir, args.old, args.new, args.skip_git)
-    except Exception as e:
-        import traceback
-        traceback.print_exc()
-        print(f"An error occurred: {e}")
+    replace_in_dir(source_dir, destination_dir, old_str, new_str, excluded_files)
