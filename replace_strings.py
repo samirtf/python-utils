@@ -44,3 +44,6 @@ def main():
 
 if __name__ == '__main__':
     main()
+
+
+# python3 replace_strings.py /path/to/dir foo bar /path/to/output --ignore_list .git .github
